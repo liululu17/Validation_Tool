@@ -1,0 +1,6 @@
+=======
+# Ignore local and dev-specific files
+__pycache__/
+.env
+venv_1/
+venv_2/
