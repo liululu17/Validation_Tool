@@ -19,6 +19,7 @@ df1_all = data["df1"]
 df2_all = data["df2"]
 df3_all =  data["df3"]
 df4_all =  data["df4"]
+df5_all =  data["df5"]
 geojson_data = data["geojson_data"]
 geojson_data_r = data["geojson_data_r"]
 df_scenario = data['df_scenario']
@@ -29,9 +30,18 @@ df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id_default]
 df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id_default]
 df3 = df3_all[df3_all['scenario_id'] == scenario_id_default]
 df4 = df4_all[df4_all['scenario_id'] == scenario_id_default]
+df5 = df5_all[df5_all['scenario_id'] == scenario_id_default]
     
 # === Compute Overall Stats for Display ===
 slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_filtered2, 'count_day', 'day_flow')
+
+# for vmt
+model_regional_vmt = df5['regional_vmt'].iloc[0]
+observed_regional_vmt = df5['regional_hpms_vmt'].iloc[0]
+vmt_on_links_with_counts = df_filtered2[['day_vmt', 'vmt_day']].sum().reset_index()
+vmt_on_links_with_counts.columns = ['metric', 'vmt']
+model_vmt_on_links_with_counts = vmt_on_links_with_counts.query("metric == 'day_vmt'")['vmt'].iloc[0]
+observed_vmt_on_links_with_counts = vmt_on_links_with_counts.query("metric == 'vmt_day'")['vmt'].iloc[0]
 
 # for truck
 slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_stats(df3, 'truckaadt', 'truckflow')
@@ -248,22 +258,52 @@ def page_volume_by_hwy():
 def page_vmt_comparison():
 
     return html.Div([
-        html.H2("VMT Comparison: Model vs Observed by Different Groups", style={'textAlign': 'center', 'marginBottom': '10px'}),
+        html.H2("VMT Comparison: Model vs Observed by Different Groups", style={'textAlign': 'center', 'marginBottom': '30px'}),
+
+        # === Statistics Box ===
+        # Row 1
+        html.Div(
+            [html.Div([
+                html.H3(f"{model_regional_vmt / 1_000_000:.2f}M", style={'marginBottom': '5px'}),
+                html.Small("Regional Model VMT", style={'marginTop': '0px'})
+            ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+
+            html.Div([
+                html.H3(f"{model_vmt_on_links_with_counts / 1_000_000:.2f}M", style={'marginBottom': '5px'}),
+                html.Small("Model VMT on links w/ counts", style={'marginTop': '0px'})
+            ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+        ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'justifyContent': 'flex-start', 'alignItems': 'flex-start'}),
+
+        # Row 2
+        html.Div(
+            [html.Div([
+                html.H3(f"{observed_regional_vmt / 1_000_000:.2f}M", style={'marginBottom': '5px'}),
+                html.Small("Regional HPMS VMT", style={'marginTop': '0px'})
+            ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+
+            html.Div([
+                html.H3(f"{observed_vmt_on_links_with_counts / 1_000_000:.2f}M", style={'marginBottom': '5px'}),
+                html.Small("Observed VMT on links w/ counts", style={'marginTop': '0px'})
+            ], style={'textAlign': 'center', 'marginBottom': '30px'}),
+        ], style={'display': 'flex', 'flexDirection': 'row', 'gap': '10px', 'justifyContent': 'flex-start', 'alignItems': 'flex-start'}),
 
         html.Div([
-            # Row 1
+            # Row 3
             html.Div([
                 dcc.Graph(figure=make_vmt_fig(df_filtered2,'pmsa_nm', 'By PMSA'), style={'width': '50%', 'height': '100%'}),
                 dcc.Graph(figure=make_vmt_fig(df_filtered2,'vcategory', 'By Category'), style={'width': '50%', 'height': '100%'})
-            ], style={'display': 'flex', 'height': '50%'}),
+            ], style={'display': 'flex', 'height': '40%'}),
 
-            # Row 2
+            # Row 4
             html.Div([
                 dcc.Graph(figure=make_vmt_fig(df_filtered2,'city_nm', 'By City'), style={'width': '50%', 'height': '100%'}),
                 dcc.Graph(figure=make_vmt_fig(df_filtered2,'rdclass', 'By Road Class'), style={'width': '50%', 'height': '100%'})
-            ], style={'display': 'flex', 'height': '50%'})
+            ], style={'display': 'flex', 'height': '40%'})
         ], style={'height': '700px'})
     ], style={'padding': '10px', 'height': '700px', 'boxSizing': 'border-box',})
+
+
+
 
 scenario_options = [
 {"label": f"{row['scenario_id']}: {row['scenario_name']}", "value": row["scenario_id"]}

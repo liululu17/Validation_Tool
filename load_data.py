@@ -6,7 +6,6 @@ import os
 import yaml
 from pathlib import Path
 from databricks import sql
-import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,7 +25,9 @@ def load_data():
     print(f"✅ Running in environment: {ENV}")
 
     if ENV == "local":
-        config = load_config()
+        script_path = os.path.abspath(__file__)
+        script_dir = os.path.dirname(script_path)
+        config = load_config(os.path.join(script_dir, "config.yaml"))
         scenario_dirs = config.get("LOCAL_SCENARIO_LIST", [])
 
         def read_metadata(scenario_path):
@@ -52,8 +53,10 @@ def load_data():
             "df2": [],
             "df3": [],
             "df4": [],
+            "df5": [],
+            "df6": [],
             "df_link": [],
-             "df_route": [],
+            "df_route": [],
             "df_scenario": []
         }
 
@@ -68,6 +71,7 @@ def load_data():
                 dfs["df2"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - allclass_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
                 dfs["df3"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - truck_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
                 dfs["df4"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - board_worksheet.csv").assign(scenario_id=meta["scenario_id"]))
+                dfs["df5"].append(pd.read_csv(f"{scenario_path}\\analysis\\validation\\vis_worksheet - regional_vmt.csv").assign(scenario_id=meta["scenario_id"]))
                 dfs["df_link"].append(pd.read_csv(f"{scenario_path}\\report\\hwyTcad.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"]))
                 dfs["df_route"].append(pd.read_csv(f"{scenario_path}\\report\\transitRoute.csv", dtype={7: str, 8: str}).assign(scenario_id=meta["scenario_id"]))
                 dfs["df_scenario"].append(pd.DataFrame([meta]))
@@ -80,6 +84,7 @@ def load_data():
         df2 = pd.concat(dfs["df2"], ignore_index=True)
         df3 = pd.concat(dfs["df3"], ignore_index=True)
         df4 = pd.concat(dfs["df4"], ignore_index=True)
+        df5 = pd.concat(dfs["df5"], ignore_index=True)
         df_link = pd.concat(dfs["df_link"],ignore_index=True)
         df_route = pd.concat(dfs["df_route"],ignore_index=True)
         df_scenario = pd.concat(dfs["df_scenario"], ignore_index=True)
@@ -104,6 +109,7 @@ def load_data():
                 df2 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.all_class WHERE scenario_id IN ({scenario_str})")
                 df3 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.truck WHERE scenario_id IN ({scenario_str})")
                 df4 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.board WHERE scenario_id IN ({scenario_str})")
+                df5 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.regional_vmt WHERE scenario_id IN ({scenario_str})")
                 df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM {catalog}.abm3.network__emme_hwy_tcad WHERE  scenario_id IN ({scenario_str})")
                 df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM {catalog}.abm3.network__transit_route WHERE  scenario_id IN ({scenario_str})")
                 df_scenario = query_to_df(cursor, f"SELECT scenario_id, scenario_name, scenario_yr FROM {catalog}.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
@@ -113,6 +119,7 @@ def load_data():
         df2 = df2.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
         df3 = df3.drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
         df4 = df4.drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
+        df5 = df5.drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
 
     # add label column
     df1['label'] = df1['fxnm'].fillna('Unknown') + ' to ' + df1['txnm'].fillna('Unknown')
@@ -159,6 +166,7 @@ def load_data():
         "df2": df2,
         "df3": df3,
         "df4": df4,
+        "df5": df5,
         "geojson_data": geojson_links_sce,
         "geojson_data_r":geojson_route_sce,
         "df_scenario":df_scenario
