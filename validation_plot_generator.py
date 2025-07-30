@@ -105,6 +105,16 @@ def compute_overall_stats(df, obs_col, model_col):
 
     return slope, r_squared, prmse, total_count
 
+def vmt_stats(df, df_filtered):
+    model_regional_vmt = df['regional_vmt'].iloc[0]
+    observed_regional_vmt = df['regional_hpms_vmt'].iloc[0]
+    vmt_on_links_with_counts = df_filtered[['day_vmt', 'vmt_day']].sum().reset_index()
+    vmt_on_links_with_counts.columns = ['metric', 'vmt']
+    model_vmt_on_links_with_counts = vmt_on_links_with_counts.query("metric == 'day_vmt'")['vmt'].iloc[0]
+    observed_vmt_on_links_with_counts = vmt_on_links_with_counts.query("metric == 'vmt_day'")['vmt'].iloc[0]
+
+    return model_regional_vmt, observed_regional_vmt, model_vmt_on_links_with_counts, observed_vmt_on_links_with_counts
+
 def build_source_ring_chart(df, source_col='source'):
     """
     Create a ring (donut) chart showing the percentage distribution of sources.

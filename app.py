@@ -12,7 +12,7 @@ import numpy as np
 from dash import callback_context
 import dash_bootstrap_components as dbc
 from load_data import load_data
-from validation_plot_generator import build_scatter_plot, compute_overall_stats, build_source_ring_chart, create_map, make_vmt_fig, bar_scatter_layout,make_bar_figures,prepare_boarding_tables
+from validation_plot_generator import *
 
 data = load_data()
 df1_all = data["df1"]
@@ -34,14 +34,6 @@ df5 = df5_all[df5_all['scenario_id'] == scenario_id_default]
     
 # === Compute Overall Stats for Display ===
 slope_all, r_squared_all, prmse_all, total_obs_all = compute_overall_stats(df_filtered2, 'count_day', 'day_flow')
-
-# for vmt
-model_regional_vmt = df5['regional_vmt'].iloc[0]
-observed_regional_vmt = df5['regional_hpms_vmt'].iloc[0]
-vmt_on_links_with_counts = df_filtered2[['day_vmt', 'vmt_day']].sum().reset_index()
-vmt_on_links_with_counts.columns = ['metric', 'vmt']
-model_vmt_on_links_with_counts = vmt_on_links_with_counts.query("metric == 'day_vmt'")['vmt'].iloc[0]
-observed_vmt_on_links_with_counts = vmt_on_links_with_counts.query("metric == 'vmt_day'")['vmt'].iloc[0]
 
 # for truck
 slope_all_t, r_squared_all_t, prmse_all_t, total_obs_all_t = compute_overall_stats(df3, 'truckaadt', 'truckflow')
@@ -257,6 +249,8 @@ def page_volume_by_hwy():
 # === Define Page 3 Layout: VMT===
 def page_vmt_comparison():
 
+    model_regional_vmt, observed_regional_vmt, model_vmt_on_links_with_counts, observed_vmt_on_links_with_counts = vmt_stats(df5, df_filtered2)
+
     return html.Div([
         html.H2("VMT Comparison: Model vs Observed by Different Groups", style={'textAlign': 'center', 'marginBottom': '30px'}),
 
@@ -399,12 +393,13 @@ app.layout = html.Div([
     Input('scenario_selector', 'value')
 )
 def update_page(pathname, scenario_id):
-    global df_filtered1, df_filtered2, df3, df4
+    global df_filtered1, df_filtered2, df3, df4, df5
 
     df_filtered1 = df1_all[df1_all['scenario_id'] == scenario_id]
     df_filtered2 = df2_all[df2_all['scenario_id'] == scenario_id]
     df3 = df3_all[df3_all['scenario_id'] == scenario_id]
     df4 = df4_all[df4_all['scenario_id'] == scenario_id]
+    df5 = df5_all[df5_all['scenario_id'] == scenario_id]
 
     if pathname == '/volume_by_hwy':
         return page_volume_by_hwy()
@@ -494,7 +489,7 @@ def zoom_from_line(clickData, hideout,scenario_id):
 
     selected_id = clickData["points"][0]["customdata"][0]
     geojson = geojson_data.get(scenario_id, {"type": "FeatureCollection", "features": []})
-    return get_map_center(selected_id, hideout,geojson, 'hwycovid')
+    return get_map_center(selected_id, hideout, geojson, 'hwycovid')
 
 @app.callback(
     Output("geojson", "hideout"),
