@@ -6,6 +6,7 @@ import os
 import yaml
 from pathlib import Path
 from databricks import sql
+from databricks.sdk.core import Config, oauth_service_principal
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -95,15 +96,23 @@ def load_data():
         scenario_str = ','.join(map(str, scenario_id_list))
         catalog = os.getenv("DBRICKS_CATALOG", "tam")
 
+        server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME")
+
+        def credential_provider():
+            config = Config(
+                host          = f"https://{server_hostname}",
+                client_id     = os.getenv("DATABRICKS_CLIENT_ID"),
+                client_secret = os.getenv("DATABRICKS_CLIENT_SECRET"))
+            return oauth_service_principal(config)
+
         def query_to_df(cursor, query):
             cursor.execute(query)
             return cursor.fetchall_arrow().to_pandas()
 
         with sql.connect(
-            server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
+            server_hostname=server_hostname,
             http_path=os.getenv("DATABRICKS_HTTP_PATH"),
-            access_token=os.getenv("DATABRICKS_TOKEN"),
-        ) as connection:
+            credential_provider=credential_provider) as connection:
             with connection.cursor() as cursor:
                 df1 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.fwy WHERE scenario_id IN ({scenario_str})")
                 df2 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.all_class WHERE scenario_id IN ({scenario_str})")
