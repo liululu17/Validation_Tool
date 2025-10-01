@@ -109,10 +109,9 @@ def load_data():
             cursor.execute(query)
             return cursor.fetchall_arrow().to_pandas()
 
-        with sql.connect(
-            server_hostname=server_hostname,
-            http_path=os.getenv("DATABRICKS_HTTP_PATH"),
-            credential_provider=credential_provider) as connection:
+        with sql.connect(server_hostname=server_hostname,
+                         http_path=os.getenv("DATABRICKS_HTTP_PATH"),
+                         credentials_provider=credential_provider) as connection:
             with connection.cursor() as cursor:
                 df1 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.fwy WHERE scenario_id IN ({scenario_str})")
                 df2 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.all_class WHERE scenario_id IN ({scenario_str})")
