@@ -6,6 +6,7 @@ import os
 import yaml
 from pathlib import Path
 from databricks import sql
+from databricks.sdk.core import Config, oauth_service_principal
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -89,30 +90,58 @@ def load_data():
         df_route = pd.concat(dfs["df_route"],ignore_index=True)
         df_scenario = pd.concat(dfs["df_scenario"], ignore_index=True)
 
+    # elif ENV == 'Azure':
+    #     raw_ids = os.getenv("AZURE_SCENARIO_LIST", "")
+    #     scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
+    #     scenario_str = ','.join(map(str, scenario_id_list))
+    #     catalog = os.getenv("DBRICKS_CATALOG", "tam")
+
+    #     server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME")
+
+    #     def credential_provider():
+    #         config = Config(
+    #             host          = f"https://{server_hostname}",
+    #             client_id     = os.getenv("DATABRICKS_CLIENT_ID"),
+    #             client_secret = os.getenv("DATABRICKS_CLIENT_SECRET"))
+    #         return oauth_service_principal(config)
+
+    #     def query_to_df(cursor, query):
+    #         cursor.execute(query)
+    #         return cursor.fetchall_arrow().to_pandas()
+        
     elif ENV == 'Azure':
         raw_ids = os.getenv("AZURE_SCENARIO_LIST", "")
         scenario_id_list = [int(s.strip()) for s in raw_ids.split(',') if s.strip().isdigit()]
         scenario_str = ','.join(map(str, scenario_id_list))
         catalog = os.getenv("DBRICKS_CATALOG", "tam")
+        server_hostname = os.getenv("DATABRICKS_SERVER_HOSTNAME")
 
-        def query_to_df(cursor, query):
-            cursor.execute(query)
-            return cursor.fetchall_arrow().to_pandas()
+        def credential_provider():
+            config = Config(
+                host          = f"https://{server_hostname}",
+                client_id     = os.getenv("DATABRICKS_CLIENT_ID"),
+                client_secret = os.getenv("DATABRICKS_CLIENT_SECRET"))
+            return oauth_service_principal(config)
 
-        with sql.connect(
-            server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
-            http_path=os.getenv("DATABRICKS_HTTP_PATH"),
-            access_token=os.getenv("DATABRICKS_TOKEN"),
-        ) as connection:
-            with connection.cursor() as cursor:
-                df1 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.fwy WHERE scenario_id IN ({scenario_str})")
-                df2 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.all_class WHERE scenario_id IN ({scenario_str})")
-                df3 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.truck WHERE scenario_id IN ({scenario_str})")
-                df4 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.board WHERE scenario_id IN ({scenario_str})")
-                df5 = query_to_df(cursor, f"SELECT * FROM {catalog}.validation.regional_vmt WHERE scenario_id IN ({scenario_str})")
-                df_link = query_to_df(cursor, f"SELECT scenario_id, ID, Length, geometry FROM {catalog}.abm3.network__emme_hwy_tcad WHERE  scenario_id IN ({scenario_str})")
-                df_route = query_to_df(cursor, f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM {catalog}.abm3.network__transit_route WHERE  scenario_id IN ({scenario_str})")
-                df_scenario = query_to_df(cursor, f"SELECT scenario_id, scenario_name, scenario_yr FROM {catalog}.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
+        def query_to_df(query):
+            """Execute query lazily - connects only when called"""
+            with sql.connect(
+                server_hostname=server_hostname,
+                http_path=os.getenv("DATABRICKS_HTTP_PATH"),
+                credentials_provider=credential_provider
+            ) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(query)
+                    return cursor.fetchall_arrow().to_pandas()
+    
+        df1 = query_to_df(f"SELECT * FROM {catalog}.validation.fwy WHERE scenario_id IN ({scenario_str})")
+        df2 = query_to_df(f"SELECT * FROM {catalog}.validation.all_class WHERE scenario_id IN ({scenario_str})")
+        df3 = query_to_df(f"SELECT * FROM {catalog}.validation.truck WHERE scenario_id IN ({scenario_str})")
+        df4 = query_to_df(f"SELECT * FROM {catalog}.validation.board WHERE scenario_id IN ({scenario_str})")
+        df5 = query_to_df(f"SELECT * FROM {catalog}.validation.regional_vmt WHERE scenario_id IN ({scenario_str})")
+        df_link = query_to_df(f"SELECT scenario_id, ID, Length, geometry FROM {catalog}.abm3.network__emme_hwy_tcad WHERE  scenario_id IN ({scenario_str})")
+        df_route = query_to_df(f"SELECT scenario_id, route_name, earlyam_hours, evening_hours, transit_route_shape as geometry FROM {catalog}.abm3.network__transit_route WHERE  scenario_id IN ({scenario_str})")
+        df_scenario = query_to_df(f"SELECT scenario_id, scenario_name, scenario_yr FROM {catalog}.abm3.main__scenario WHERE scenario_id IN ({scenario_str})")
 
         # Clean up data
         df1 = df1.dropna(subset=['count_day', 'day_flow']).drop(columns=['loader__delta_hash_key','loader__updated_date'], errors='ignore').drop_duplicates()
